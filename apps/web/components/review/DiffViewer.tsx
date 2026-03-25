@@ -5,7 +5,7 @@ import {
   ReactCompareSlider,
   ReactCompareSliderImage,
 } from "react-compare-slider";
-import type { ReviewPage, Route } from "@deploydiff/db";
+import type { ReviewPage, Route } from "@prisma/client";
 import { cn } from "@/lib/utils";
 
 type ReviewPageWithRoute = ReviewPage & { route: Route };

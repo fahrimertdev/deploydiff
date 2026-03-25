@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { ReviewStatus } from "@deploydiff/db";
+import type { ReviewStatus } from "@prisma/client";
 
 const statusConfig: Record<
   ReviewStatus,

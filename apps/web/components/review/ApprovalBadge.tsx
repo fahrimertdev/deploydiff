@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { ApprovalStatus } from "@deploydiff/db";
+import type { ApprovalStatus } from "@prisma/client";
 
 const approvalConfig: Record<
   ApprovalStatus,

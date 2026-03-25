@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { ReviewStatus } from "@deploydiff/db";
+import type { ReviewStatus } from "@prisma/client";
 
 interface ReviewPollerProps {
   reviewId: string;

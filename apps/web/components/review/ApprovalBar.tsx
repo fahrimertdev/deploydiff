@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle, XCircle } from "lucide-react";
-import type { ApprovalStatus } from "@deploydiff/db";
+import type { ApprovalStatus } from "@prisma/client";
 import { formatDate } from "@/lib/utils";
 
 interface Approval {

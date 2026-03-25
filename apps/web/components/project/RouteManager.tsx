@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Globe } from "lucide-react";
-import type { Route } from "@deploydiff/db";
+import type { Route } from "@prisma/client";
 
 interface RouteManagerProps {
   projectId: string;

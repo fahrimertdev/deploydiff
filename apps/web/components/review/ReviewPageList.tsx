@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { cn, severityColor, severityLabel } from "@/lib/utils";
 import { DiffViewer } from "./DiffViewer";
-import type { ReviewPage, Route } from "@deploydiff/db";
+import type { ReviewPage, Route } from "@prisma/client";
 
 type ReviewPageWithRoute = ReviewPage & { route: Route };
 

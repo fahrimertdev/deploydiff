@@ -1,4 +1,4 @@
-import { PrismaClient } from "@deploydiff/db";
+import { PrismaClient } from "@prisma/client";
 import type { Job } from "bullmq";
 import type { ReviewJobPayload } from "../queues.js";
 import { withBrowser } from "../capture/browser.js";
