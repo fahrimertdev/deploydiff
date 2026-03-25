@@ -52,7 +52,7 @@ export default async function ReviewDetailPage({
     review.status === "pending" || review.status === "capturing" || review.status === "diffing";
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 w-full">
       {/* Breadcrumb */}
       <Link
         href={`/projects/${project.id}`}
@@ -121,14 +121,14 @@ export default async function ReviewDetailPage({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid gap-6" style={{ gridTemplateColumns: "1fr 300px" }}>
         {/* Page list */}
-        <div className="col-span-2">
+        <div className="min-w-0">
           <ReviewPageList pages={review.pages} />
         </div>
 
         {/* Sidebar */}
-        <div className="col-span-1 space-y-4">
+        <div className="space-y-4">
           {/* Approval */}
           {review.status === "ready" && (
             <ApprovalBar

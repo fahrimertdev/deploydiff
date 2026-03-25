@@ -83,21 +83,22 @@ export function DiffViewer({ page }: DiffViewerProps) {
       </div>
 
       {/* Viewer */}
-      <div className="overflow-auto max-h-[600px]">
+      <div className="overflow-auto" style={{ maxHeight: "calc(100vh - 220px)" }}>
         {mode === "slider" && (
           <ReactCompareSlider
+            style={{ width: "100%" }}
             itemOne={
               <ReactCompareSliderImage
                 src={page.beforeImageUrl}
                 alt="Before"
-                style={{ objectFit: "cover", objectPosition: "top" }}
+                style={{ objectFit: "contain", objectPosition: "top", background: "#f9fafb" }}
               />
             }
             itemTwo={
               <ReactCompareSliderImage
                 src={page.afterImageUrl}
                 alt="After"
-                style={{ objectFit: "cover", objectPosition: "top" }}
+                style={{ objectFit: "contain", objectPosition: "top", background: "#f9fafb" }}
               />
             }
           />

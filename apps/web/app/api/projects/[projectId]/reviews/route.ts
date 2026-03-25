@@ -92,7 +92,7 @@ export async function POST(
     // Enqueue the capture + diff job
     const queue = getReviewQueue();
     await queue.add(
-      `review:${review.id}`,
+      `review-${review.id}`,
       {
         reviewId: review.id,
         projectId: project.id,
@@ -105,7 +105,7 @@ export async function POST(
           viewport: route.viewportConfig as { width: number; height: number },
         })),
       },
-      { jobId: `review:${review.id}` }
+      { jobId: `review-${review.id}` }
     );
 
     return NextResponse.json({ review }, { status: 201 });

@@ -24,9 +24,9 @@ export function ReviewPageList({ pages }: ReviewPageListProps) {
         Pages ({pages.length})
       </h2>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid gap-4" style={{ gridTemplateColumns: "180px 1fr" }}>
         {/* Page list */}
-        <div className="col-span-1 space-y-1.5">
+        <div className="space-y-1.5">
           {pages.map((page) => (
             <button
               key={page.id}
@@ -66,7 +66,7 @@ export function ReviewPageList({ pages }: ReviewPageListProps) {
         </div>
 
         {/* Diff viewer */}
-        <div className="col-span-2">
+        <div className="min-w-0">
           {selectedPage ? (
             <DiffViewer page={selectedPage} />
           ) : (
