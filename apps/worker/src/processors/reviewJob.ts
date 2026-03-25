@@ -9,12 +9,21 @@ import { uploadScreenshot, buildKey } from "../storage/upload.js";
 
 const prisma = new PrismaClient();
 
+const VIEWPORT_SIZES: Record<string, { width: number; height: number }> = {
+  desktop: { width: 1280, height: 800 },
+  tablet:  { width: 768,  height: 1024 },
+  mobile:  { width: 375,  height: 812 },
+};
+
 export async function reviewJobProcessor(
   job: Job<ReviewJobPayload>
 ): Promise<void> {
-  const { reviewId, productionUrl, previewUrl, routes } = job.data;
+  const { reviewId, productionUrl, previewUrl, routes, viewportPresets } = job.data;
+  const presets = viewportPresets?.length ? viewportPresets : ["desktop"];
 
-  console.log(`[worker] Starting review ${reviewId} — ${routes.length} routes`);
+  console.log(
+    `[worker] Starting review ${reviewId} — ${routes.length} routes × ${presets.join(", ")}`
+  );
 
   // ── Phase 1: Update status to capturing ─────────────────────────────────
   await prisma.review.update({
@@ -25,6 +34,7 @@ export async function reviewJobProcessor(
   // ── Phase 2: Capture screenshots ─────────────────────────────────────────
   const capturedPages: Array<{
     routeId: string;
+    viewportLabel: string;
     beforeBuffer: Buffer | null;
     afterBuffer: Buffer | null;
     captureError: string | null;
@@ -32,65 +42,54 @@ export async function reviewJobProcessor(
 
   await withBrowser(async (browser) => {
     for (const route of routes) {
-      const beforeUrl = `${productionUrl.replace(/\/$/, "")}${route.path}`;
-      const afterUrl = `${previewUrl.replace(/\/$/, "")}${route.path}`;
+      for (const preset of presets) {
+        const viewport = VIEWPORT_SIZES[preset] ?? VIEWPORT_SIZES.desktop;
+        const beforeUrl = `${productionUrl.replace(/\/$/, "")}${route.path}`;
+        const afterUrl  = `${previewUrl.replace(/\/$/, "")}${route.path}`;
 
-      let beforeBuffer: Buffer | null = null;
-      let afterBuffer: Buffer | null = null;
-      let captureError: string | null = null;
+        let beforeBuffer: Buffer | null = null;
+        let afterBuffer:  Buffer | null = null;
+        let captureError: string | null = null;
 
-      try {
-        console.log(`[worker] Capturing ${route.path}`);
+        try {
+          console.log(`[worker] Capturing ${route.path} @ ${preset}`);
 
-        [beforeBuffer, afterBuffer] = await Promise.all([
-          captureScreenshot({
-            browser,
-            url: beforeUrl,
-            viewport: route.viewport,
-            ignoreRules: route.ignoreRules,
-          }),
-          captureScreenshot({
-            browser,
-            url: afterUrl,
-            viewport: route.viewport,
-            ignoreRules: route.ignoreRules,
-          }),
-        ]);
+          [beforeBuffer, afterBuffer] = await Promise.all([
+            captureScreenshot({ browser, url: beforeUrl, viewport, ignoreRules: route.ignoreRules }),
+            captureScreenshot({ browser, url: afterUrl,  viewport, ignoreRules: route.ignoreRules }),
+          ]);
 
-        // Upload screenshots
-        const [beforeUrl_, afterUrl_] = await Promise.all([
-          uploadScreenshot(buildKey(reviewId, route.routeId, "before"), beforeBuffer),
-          uploadScreenshot(buildKey(reviewId, route.routeId, "after"), afterBuffer),
-        ]);
+          const [beforeUrl_, afterUrl_] = await Promise.all([
+            uploadScreenshot(buildKey(reviewId, route.routeId, `${preset}-before`), beforeBuffer),
+            uploadScreenshot(buildKey(reviewId, route.routeId, `${preset}-after`),  afterBuffer),
+          ]);
 
-        await prisma.reviewPage.update({
-          where: {
-            reviewId_routeId: { reviewId, routeId: route.routeId },
-          },
-          data: {
-            beforeImageUrl: beforeUrl_,
-            afterImageUrl: afterUrl_,
-          },
-        });
-      } catch (err) {
-        captureError = err instanceof Error ? err.message : String(err);
-        console.error(`[worker] Capture failed for ${route.path}:`, captureError);
+          const page = await prisma.reviewPage.findFirst({
+            where: { reviewId, routeId: route.routeId, viewportLabel: preset },
+          });
+          if (page) {
+            await prisma.reviewPage.update({
+              where: { id: page.id },
+              data: { beforeImageUrl: beforeUrl_, afterImageUrl: afterUrl_ },
+            });
+          }
+        } catch (err) {
+          captureError = err instanceof Error ? err.message : String(err);
+          console.error(`[worker] Capture failed for ${route.path} @ ${preset}:`, captureError);
 
-        await prisma.reviewPage.update({
-          where: { reviewId_routeId: { reviewId, routeId: route.routeId } },
-          data: {
-            changeStatus: "error",
-            captureError,
-          },
-        });
+          const page = await prisma.reviewPage.findFirst({
+            where: { reviewId, routeId: route.routeId, viewportLabel: preset },
+          });
+          if (page) {
+            await prisma.reviewPage.update({
+              where: { id: page.id },
+              data: { changeStatus: "error", captureError },
+            });
+          }
+        }
+
+        capturedPages.push({ routeId: route.routeId, viewportLabel: preset, beforeBuffer, afterBuffer, captureError });
       }
-
-      capturedPages.push({
-        routeId: route.routeId,
-        beforeBuffer,
-        afterBuffer,
-        captureError,
-      });
     }
   });
 
@@ -105,6 +104,7 @@ export async function reviewJobProcessor(
     routeId: string;
     path: string;
     label: string;
+    viewportLabel: string;
     status: string;
     severity: string | null;
   }> = [];
@@ -117,6 +117,7 @@ export async function reviewJobProcessor(
         routeId: captured.routeId,
         path: route.path,
         label: route.path,
+        viewportLabel: captured.viewportLabel,
         status: "error",
         severity: null,
       });
@@ -124,53 +125,56 @@ export async function reviewJobProcessor(
     }
 
     try {
-      const { diffBuffer, diffScore } = await computeDiff(
-        captured.beforeBuffer,
-        captured.afterBuffer
-      );
-
-      const severity = computeSeverity(diffScore);
+      const { diffBuffer, diffScore } = await computeDiff(captured.beforeBuffer, captured.afterBuffer);
+      const severity     = computeSeverity(diffScore);
       const changeStatus = diffScore === 0 ? "unchanged" : "changed";
 
       const diffUrl = await uploadScreenshot(
-        buildKey(reviewId, captured.routeId, "diff"),
+        buildKey(reviewId, captured.routeId, `${captured.viewportLabel}-diff`),
         diffBuffer
       );
 
-      await prisma.reviewPage.update({
-        where: { reviewId_routeId: { reviewId, routeId: captured.routeId } },
-        data: {
-          diffImageUrl: diffUrl,
-          diffScore,
-          severity,
-          changeStatus,
-        },
+      const diffPage = await prisma.reviewPage.findFirst({
+        where: { reviewId, routeId: captured.routeId, viewportLabel: captured.viewportLabel },
       });
+      if (diffPage) {
+        await prisma.reviewPage.update({
+          where: { id: diffPage.id },
+          data: { diffImageUrl: diffUrl, diffScore, severity, changeStatus },
+        });
+      }
 
       summary.push({
         routeId: captured.routeId,
         path: route.path,
         label: route.path,
+        viewportLabel: captured.viewportLabel,
         status: changeStatus,
         severity,
       });
 
       console.log(
-        `[worker] Diff done for ${route.path}: ${severity} (${(diffScore * 100).toFixed(2)}% changed)`
+        `[worker] Diff ${route.path} @ ${captured.viewportLabel}: ${severity} (${(diffScore * 100).toFixed(2)}%)`
       );
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[worker] Diff failed for ${route.path}:`, errMsg);
+      console.error(`[worker] Diff failed for ${route.path} @ ${captured.viewportLabel}:`, errMsg);
 
-      await prisma.reviewPage.update({
-        where: { reviewId_routeId: { reviewId, routeId: captured.routeId } },
-        data: { changeStatus: "error", captureError: errMsg },
+      const errPage = await prisma.reviewPage.findFirst({
+        where: { reviewId, routeId: captured.routeId, viewportLabel: captured.viewportLabel },
       });
+      if (errPage) {
+        await prisma.reviewPage.update({
+          where: { id: errPage.id },
+          data: { changeStatus: "error", captureError: errMsg },
+        });
+      }
 
       summary.push({
         routeId: captured.routeId,
         path: route.path,
         label: route.path,
+        viewportLabel: captured.viewportLabel,
         status: "error",
         severity: null,
       });
@@ -180,10 +184,7 @@ export async function reviewJobProcessor(
   // ── Phase 5: Mark review as ready ────────────────────────────────────────
   await prisma.review.update({
     where: { id: reviewId },
-    data: {
-      status: "ready",
-      summary,
-    },
+    data: { status: "ready", summary },
   });
 
   console.log(`[worker] Review ${reviewId} complete.`);

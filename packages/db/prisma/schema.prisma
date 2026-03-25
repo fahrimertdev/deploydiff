@@ -71,6 +71,8 @@ model Project {
   ownerId           String
   productionUrl     String
   previewSourceType String   @default("manual") // "manual" | "vercel" | "github"
+  viewportPresets   Json     @default("[\"desktop\"]") // ["desktop","tablet","mobile"]
+  webhookSecret     String?  // shared secret for GitHub/Vercel webhooks
   settings          Json     @default("{}")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -140,6 +142,7 @@ model ReviewPage {
   id             String       @id @default(cuid())
   reviewId       String
   routeId        String
+  viewportLabel  String       @default("desktop") // "desktop" | "tablet" | "mobile"
   beforeImageUrl String?      // S3 URL — production screenshot
   afterImageUrl  String?      // S3 URL — preview screenshot
   diffImageUrl   String?      // S3 URL — pixelmatch diff overlay
@@ -154,7 +157,7 @@ model ReviewPage {
   route    Route     @relation(fields: [routeId], references: [id])
   comments Comment[]
 
-  @@unique([reviewId, routeId])
+  @@unique([reviewId, routeId, viewportLabel])
   @@index([reviewId])
 }
 

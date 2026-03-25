@@ -66,6 +66,8 @@ export async function POST(
     const { previewUrl, sourceRef } = parsed.data;
     const shareToken = generateShareToken();
 
+    const viewportPresets = (project.viewportPresets as string[]) ?? ["desktop"];
+
     // Create the review and all ReviewPage stubs in a transaction
     const review = await prisma.$transaction(async (tx) => {
       const review = await tx.review.create({
@@ -79,12 +81,15 @@ export async function POST(
         },
       });
 
-      await tx.reviewPage.createMany({
-        data: project.routes.map((route) => ({
+      // One stub per route × viewport
+      const stubs = project.routes.flatMap((route) =>
+        viewportPresets.map((vp) => ({
           reviewId: review.id,
           routeId: route.id,
-        })),
-      });
+          viewportLabel: vp,
+        }))
+      );
+      await tx.reviewPage.createMany({ data: stubs });
 
       return review;
     });
@@ -98,11 +103,11 @@ export async function POST(
         projectId: project.id,
         productionUrl: project.productionUrl,
         previewUrl,
+        viewportPresets,
         routes: project.routes.map((route) => ({
           routeId: route.id,
           path: route.path,
           ignoreRules: route.ignoreRules as string[],
-          viewport: route.viewportConfig as { width: number; height: number },
         })),
       },
       { jobId: `review-${review.id}` }

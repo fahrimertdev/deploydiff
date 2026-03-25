@@ -1,4 +1,4 @@
-import { Queue, Worker, QueueEvents } from "bullmq";
+import { Worker } from "bullmq";
 import IORedis from "ioredis";
 
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
@@ -14,16 +14,16 @@ export interface ReviewJobPayload {
   projectId: string;
   productionUrl: string;
   previewUrl: string;
+  viewportPresets: string[]; // ["desktop", "tablet", "mobile"]
   routes: Array<{
     routeId: string;
     path: string;
     ignoreRules: string[];
-    viewport: { width: number; height: number };
   }>;
 }
 
 export function createReviewWorker(
-  processor: (job: { id: string; data: ReviewJobPayload }) => Promise<void>
+  processor: (job: import("bullmq").Job<ReviewJobPayload>) => Promise<void>
 ) {
   return new Worker<ReviewJobPayload>(REVIEW_QUEUE_NAME, processor, {
     connection,

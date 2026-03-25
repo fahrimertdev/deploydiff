@@ -32,6 +32,6 @@ export async function uploadScreenshot(
   return `${publicBase}/${key}`;
 }
 
-export function buildKey(reviewId: string, routeId: string, type: "before" | "after" | "diff"): string {
+export function buildKey(reviewId: string, routeId: string, type: string): string {
   return `reviews/${reviewId}/${routeId}/${type}.png`;
 }

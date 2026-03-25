@@ -12,6 +12,8 @@ async function getProjectOrFail(projectId: string, userId: string) {
 const updateProjectSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   productionUrl: z.string().url().optional(),
+  viewportPresets: z.array(z.enum(["desktop", "tablet", "mobile"])).min(1).optional(),
+  webhookSecret: z.string().max(200).nullable().optional(),
 });
 
 export async function GET(
