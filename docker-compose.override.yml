@@ -1,0 +1,15 @@
+# Local development override — runs only infrastructure (postgres, redis, minio)
+# The web app and worker run locally with `npm run dev`
+#
+# Usage:
+#   docker compose up -d    # starts postgres + redis + minio only
+#   npm run dev             # starts web + worker locally
+
+version: "3.9"
+
+services:
+  web:
+    profiles: ["full"]
+
+  worker:
+    profiles: ["full"]

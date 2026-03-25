@@ -1,0 +1,21 @@
+{
+  "name": "deploydiff",
+  "version": "0.0.1",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w apps/web\" \"npm run dev -w apps/worker\"",
+    "build": "npm run build -w packages/db && npm run build -w apps/web && npm run build -w apps/worker",
+    "db:generate": "npm run generate -w packages/db",
+    "db:migrate": "npm run migrate -w packages/db",
+    "db:migrate:dev": "npm run migrate:dev -w packages/db",
+    "db:studio": "npm run studio -w packages/db"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.4.5"
+  }
+}

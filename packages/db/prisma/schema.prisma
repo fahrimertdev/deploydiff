@@ -1,0 +1,204 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth (NextAuth v5) ────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?   // hashed, for credentials provider
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts  Account[]
+  sessions  Session[]
+  projects  Project[]
+  comments  Comment[]
+  approvals Approval[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Core Models ──────────────────────────────────────────────────────────
+
+model Project {
+  id                String   @id @default(cuid())
+  name              String
+  ownerId           String
+  productionUrl     String
+  previewSourceType String   @default("manual") // "manual" | "vercel" | "github"
+  settings          Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  owner   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  routes  Route[]
+  reviews Review[]
+
+  @@index([ownerId])
+}
+
+model Route {
+  id             String   @id @default(cuid())
+  projectId      String
+  path           String   // e.g. "/", "/pricing", "/about"
+  label          String   // e.g. "Home", "Pricing"
+  requiresAuth   Boolean  @default(false)
+  ignoreRules    Json     @default("[]") // array of CSS selectors to mask before diff
+  viewportConfig Json     @default("{\"width\": 1280, \"height\": 800}")
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  reviewPages ReviewPage[]
+
+  @@unique([projectId, path])
+  @@index([projectId])
+}
+
+model Review {
+  id             String         @id @default(cuid())
+  projectId      String
+  shareToken     String         @unique // nanoid(12) — public share URL token
+  previewUrl     String         // full base URL of preview
+  productionUrl  String         // snapshot of production URL at review creation time
+  sourceRef      String?        // git SHA, branch name, or PR ref (optional for MVP)
+  status         ReviewStatus   @default(pending)
+  approvalStatus ApprovalStatus @default(pending)
+  summary        Json           @default("[]") // [{routeId, label, path, status, severity}]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pages     ReviewPage[]
+  comments  Comment[]
+  approvals Approval[]
+
+  @@index([projectId])
+  @@index([shareToken])
+}
+
+enum ReviewStatus {
+  pending   // job queued, not yet started
+  capturing // screenshots in progress
+  diffing   // diff computation in progress
+  ready     // review is viewable
+  failed    // job failed unrecoverably
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  needs_changes
+}
+
+model ReviewPage {
+  id             String       @id @default(cuid())
+  reviewId       String
+  routeId        String
+  beforeImageUrl String?      // S3 URL — production screenshot
+  afterImageUrl  String?      // S3 URL — preview screenshot
+  diffImageUrl   String?      // S3 URL — pixelmatch diff overlay
+  changeStatus   ChangeStatus @default(unknown)
+  diffScore      Float?       // 0.0–1.0 fraction of changed pixels
+  severity       String?      // "none" | "minor" | "significant" | "major"
+  captureError   String?      // error message if capture failed for this page
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  review   Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  route    Route     @relation(fields: [routeId], references: [id])
+  comments Comment[]
+
+  @@unique([reviewId, routeId])
+  @@index([reviewId])
+}
+
+enum ChangeStatus {
+  unknown
+  unchanged
+  changed
+  error
+}
+
+model Comment {
+  id           String   @id @default(cuid())
+  reviewId     String
+  reviewPageId String?  // null = review-level comment
+  authorId     String?  // null if guest commenter
+  guestName    String?  // required when authorId is null
+  body         String   @db.Text
+  resolved     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  review     Review      @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reviewPage ReviewPage? @relation(fields: [reviewPageId], references: [id])
+  author     User?       @relation(fields: [authorId], references: [id])
+
+  @@index([reviewId])
+  @@index([reviewPageId])
+}
+
+model Approval {
+  id        String           @id @default(cuid())
+  reviewId  String
+  actorId   String?          // null if guest approver
+  guestName String?
+  decision  ApprovalDecision
+  note      String?          @db.Text
+  createdAt DateTime         @default(now())
+
+  review Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  actor  User?  @relation(fields: [actorId], references: [id])
+
+  @@index([reviewId])
+}
+
+enum ApprovalDecision {
+  approved
+  needs_changes
+}
