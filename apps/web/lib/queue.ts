@@ -44,10 +44,10 @@ export interface ReviewJobPayload {
   projectId: string;
   productionUrl: string;
   previewUrl: string;
+  viewportPresets: string[];
   routes: Array<{
     routeId: string;
     path: string;
     ignoreRules: string[];
-    viewport: { width: number; height: number };
   }>;
 }

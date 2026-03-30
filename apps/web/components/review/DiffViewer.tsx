@@ -83,67 +83,67 @@ export function DiffViewer({ page }: DiffViewerProps) {
       </div>
 
       {/* Viewer */}
-      <div className="overflow-auto" style={{ maxHeight: "calc(100vh - 220px)" }}>
-        {mode === "slider" && (
-          <ReactCompareSlider
-            style={{ width: "100%" }}
-            itemOne={
-              <ReactCompareSliderImage
-                src={page.beforeImageUrl}
-                alt="Before"
-                style={{ objectFit: "contain", objectPosition: "top", background: "#f9fafb" }}
-              />
-            }
-            itemTwo={
-              <ReactCompareSliderImage
-                src={page.afterImageUrl}
-                alt="After"
-                style={{ objectFit: "contain", objectPosition: "top", background: "#f9fafb" }}
-              />
-            }
-          />
-        )}
+      <div className="overflow-auto bg-gray-100" style={{ maxHeight: "calc(100vh - 220px)" }}>
+        {(() => {
+          const vp = page.viewportLabel;
+          const maxW = vp === "mobile" ? 375 : vp === "tablet" ? 768 : undefined;
+          const wrapStyle = maxW
+            ? { maxWidth: maxW, margin: "0 auto", background: "#fff" }
+            : undefined;
 
-        {mode === "side-by-side" && (
-          <div className="grid grid-cols-2 divide-x">
-            <div>
-              <p className="text-xs text-center py-1 bg-gray-50 text-muted-foreground border-b">
-                Before (production)
-              </p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={page.beforeImageUrl}
-                alt="Before"
-                className="w-full"
+          if (mode === "slider") return (
+            <div style={wrapStyle}>
+              <ReactCompareSlider
+                style={{ width: "100%" }}
+                itemOne={
+                  <ReactCompareSliderImage
+                    src={page.beforeImageUrl}
+                    alt="Before"
+                    style={{ objectFit: "contain", objectPosition: "top", background: "#f9fafb" }}
+                  />
+                }
+                itemTwo={
+                  <ReactCompareSliderImage
+                    src={page.afterImageUrl}
+                    alt="After"
+                    style={{ objectFit: "contain", objectPosition: "top", background: "#f9fafb" }}
+                  />
+                }
               />
             </div>
-            <div>
+          );
+
+          if (mode === "side-by-side") return (
+            <div className="grid grid-cols-2 divide-x" style={wrapStyle}>
+              <div>
+                <p className="text-xs text-center py-1 bg-gray-50 text-muted-foreground border-b">
+                  Before (production)
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={page.beforeImageUrl} alt="Before" className="w-full" />
+              </div>
+              <div>
+                <p className="text-xs text-center py-1 bg-gray-50 text-muted-foreground border-b">
+                  After (preview)
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={page.afterImageUrl} alt="After" className="w-full" />
+              </div>
+            </div>
+          );
+
+          if (mode === "diff" && page.diffImageUrl) return (
+            <div style={wrapStyle}>
               <p className="text-xs text-center py-1 bg-gray-50 text-muted-foreground border-b">
-                After (preview)
+                Diff overlay — highlighted pixels changed
               </p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={page.afterImageUrl}
-                alt="After"
-                className="w-full"
-              />
+              <img src={page.diffImageUrl} alt="Diff" className="w-full" />
             </div>
-          </div>
-        )}
+          );
 
-        {mode === "diff" && page.diffImageUrl && (
-          <div>
-            <p className="text-xs text-center py-1 bg-gray-50 text-muted-foreground border-b">
-              Diff overlay — highlighted pixels changed
-            </p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={page.diffImageUrl}
-              alt="Diff"
-              className="w-full"
-            />
-          </div>
-        )}
+          return null;
+        })()}
 
         {mode === "diff" && !page.diffImageUrl && (
           <div className="p-8 text-center text-sm text-muted-foreground">

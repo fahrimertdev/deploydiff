@@ -24,8 +24,8 @@ export async function captureScreenshot(
 
   try {
     await page.goto(url, {
-      waitUntil: "networkidle",
-      timeout: 30_000,
+      waitUntil: "load",
+      timeout: 60_000,
     });
 
     await stabilizePage(page, ignoreRules);
