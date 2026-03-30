@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { validateUrl, UrlValidationError } from "@/lib/validateUrl";
 import { z } from "zod";
 
 const createProjectSchema = z.object({
@@ -41,6 +42,14 @@ export async function POST(req: NextRequest) {
     }
 
     const { name, productionUrl } = parsed.data;
+
+    try {
+      await validateUrl(productionUrl);
+    } catch (err) {
+      if (err instanceof UrlValidationError)
+        return NextResponse.json({ error: err.message }, { status: 400 });
+      throw err;
+    }
 
     const project = await prisma.project.create({
       data: {

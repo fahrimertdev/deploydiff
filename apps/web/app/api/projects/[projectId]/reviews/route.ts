@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getReviewQueue } from "@/lib/queue";
 import { generateShareToken } from "@/lib/share";
+import { validateUrl, UrlValidationError } from "@/lib/validateUrl";
+import { assertPreviewAuthorized, PreviewAuthError } from "@/lib/previewAuth";
+import { decrypt } from "@/lib/encrypt";
 import { z } from "zod";
 
 const createReviewSchema = z.object({
@@ -64,6 +67,23 @@ export async function POST(
       return NextResponse.json({ error: "Invalid input." }, { status: 400 });
 
     const { previewUrl, sourceRef } = parsed.data;
+
+    try {
+      await validateUrl(previewUrl);
+    } catch (err) {
+      if (err instanceof UrlValidationError)
+        return NextResponse.json({ error: err.message }, { status: 400 });
+      throw err;
+    }
+
+    try {
+      assertPreviewAuthorized(previewUrl, project.productionUrl, project.allowedPreviewHosts);
+    } catch (err) {
+      if (err instanceof PreviewAuthError)
+        return NextResponse.json({ error: err.message }, { status: 403 });
+      throw err;
+    }
+
     const shareToken = generateShareToken();
 
     const viewportPresets = (project.viewportPresets as string[]) ?? ["desktop"];
@@ -104,7 +124,7 @@ export async function POST(
         productionUrl: project.productionUrl,
         previewUrl,
         viewportPresets,
-        authCookies: project.authCookies ?? null,
+        authCookies: project.authCookies ? decrypt(project.authCookies) : null,
         routes: project.routes.map((route) => ({
           routeId: route.id,
           path: route.path,

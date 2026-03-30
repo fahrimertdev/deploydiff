@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { validateUrl, UrlValidationError } from "@/lib/validateUrl";
+import { encrypt } from "@/lib/encrypt";
 import { z } from "zod";
 
 async function getProjectOrFail(projectId: string, userId: string) {
@@ -15,6 +17,7 @@ const updateProjectSchema = z.object({
   viewportPresets: z.array(z.enum(["desktop", "tablet", "mobile"])).min(1).optional(),
   webhookSecret: z.string().max(200).nullable().optional(),
   authCookies: z.string().max(10000).nullable().optional(),
+  allowedPreviewHosts: z.array(z.string().max(253)).max(20).optional(),
 });
 
 export async function GET(
@@ -50,7 +53,11 @@ export async function GET(
     }),
   ]);
 
-  return NextResponse.json({ project, routes, reviews });
+  // Never expose encrypted authCookies — return a boolean presence flag instead
+  const { authCookies: _ac, ...safeProject } = project;
+  const projectResponse = { ...safeProject, authCookiesSet: _ac !== null };
+
+  return NextResponse.json({ project: projectResponse, routes, reviews });
 }
 
 export async function PATCH(
@@ -71,9 +78,24 @@ export async function PATCH(
     if (!parsed.success)
       return NextResponse.json({ error: "Invalid input." }, { status: 400 });
 
+    if (parsed.data.productionUrl) {
+      try {
+        await validateUrl(parsed.data.productionUrl);
+      } catch (err) {
+        if (err instanceof UrlValidationError)
+          return NextResponse.json({ error: err.message }, { status: 400 });
+        throw err;
+      }
+    }
+
+    const updateData = { ...parsed.data };
+    if (updateData.authCookies) {
+      updateData.authCookies = encrypt(updateData.authCookies);
+    }
+
     const updated = await prisma.project.update({
       where: { id: project.id },
-      data: parsed.data,
+      data: updateData,
     });
 
     return NextResponse.json({ project: updated });

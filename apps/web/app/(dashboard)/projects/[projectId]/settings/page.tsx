@@ -12,7 +12,8 @@ interface Project {
   productionUrl: string;
   viewportPresets: string[];
   webhookSecret: string | null;
-  authCookies: string | null;
+  authCookiesSet: boolean;
+  allowedPreviewHosts: string[];
 }
 
 const VIEWPORT_OPTIONS = [
@@ -28,9 +29,11 @@ export default function ProjectSettingsPage() {
   const [name, setName]                   = useState("");
   const [productionUrl, setProductionUrl] = useState("");
   const [viewports, setViewports]         = useState<string[]>(["desktop"]);
-  const [webhookSecret, setWebhookSecret] = useState("");
-  const [authCookies, setAuthCookies]     = useState("");
-  const [saving, setSaving]               = useState(false);
+  const [webhookSecret, setWebhookSecret]         = useState("");
+  const [authCookies, setAuthCookies]             = useState("");
+  const [authCookiesSet, setAuthCookiesSet]       = useState(false);
+  const [allowedPreviewHosts, setAllowedPreviewHosts] = useState("");
+  const [saving, setSaving]                       = useState(false);
   const [deleting, setDeleting]           = useState(false);
   const [error, setError]                 = useState<string | null>(null);
   const [saved, setSaved]                 = useState(false);
@@ -46,7 +49,8 @@ export default function ProjectSettingsPage() {
         setProductionUrl(p.productionUrl);
         setViewports((p.viewportPresets as string[]) ?? ["desktop"]);
         setWebhookSecret(p.webhookSecret ?? "");
-        setAuthCookies(p.authCookies ?? "");
+        setAuthCookiesSet(p.authCookiesSet);
+        setAllowedPreviewHosts((p.allowedPreviewHosts ?? []).join("\n"));
       });
   }, [params.projectId]);
 
@@ -74,6 +78,10 @@ export default function ProjectSettingsPage() {
           viewportPresets: viewports,
           webhookSecret: webhookSecret || null,
           authCookies: authCookies || null,
+          allowedPreviewHosts: allowedPreviewHosts
+            .split("\n")
+            .map((h) => h.trim())
+            .filter(Boolean),
         }),
       });
 
@@ -84,6 +92,10 @@ export default function ProjectSettingsPage() {
       }
 
       setSaved(true);
+      if (authCookies) {
+        setAuthCookiesSet(true);
+        setAuthCookies("");
+      }
       router.refresh();
     } catch {
       setError("Something went wrong.");
@@ -274,27 +286,40 @@ export default function ProjectSettingsPage() {
         <div className="bg-white rounded-xl border p-6">
           <h2 className="text-base font-semibold text-gray-900 mb-1">Authentication</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Paste your session cookies here so the capture engine can access routes that require login.
+            Paste your session cookies so the capture engine can access routes that require login. Cookies are encrypted at rest.
           </p>
 
           <div className="bg-gray-50 border rounded-lg p-4 mb-4 space-y-2">
             <p className="text-xs font-semibold text-gray-700">How to get your cookies</p>
             <ol className="text-xs text-gray-600 space-y-1.5 list-decimal list-inside">
               <li>Open your app in Chrome and <strong>sign in</strong> with a test account</li>
-              <li>Press <kbd className="bg-white border rounded px-1 py-0.5 font-mono text-[10px]">F12</kbd> to open DevTools → go to the <strong>Network</strong> tab</li>
-              <li>Refresh the page, then click on any request to your site</li>
-              <li>In the <strong>Headers</strong> panel, find <strong>Request Headers</strong></li>
-              <li>Copy the full value next to <code className="bg-white border rounded px-1 font-mono text-[10px]">Cookie:</code> and paste below</li>
+              <li>Press <kbd className="bg-white border rounded px-1 py-0.5 font-mono text-[10px]">F12</kbd> → <strong>Network</strong> tab</li>
+              <li>Refresh the page, click any request to your site</li>
+              <li>In <strong>Request Headers</strong>, find the <code className="bg-white border rounded px-1 font-mono text-[10px]">Cookie</code> header</li>
+              <li>Copy the full value and paste below</li>
             </ol>
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mt-2">
-              Use a <strong>dedicated test account</strong>, not your personal account. Cookies grant full access to the account.
+              Use a <strong>dedicated test account</strong>, not your personal account. Cookies grant full access to that account.
             </p>
           </div>
+
+          {authCookiesSet && !authCookies && (
+            <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-3">
+              <p className="text-xs text-green-700 font-medium">Cookies saved — paste a new value below to replace them.</p>
+              <button
+                type="button"
+                onClick={() => { setAuthCookies(" "); setAuthCookiesSet(false); }}
+                className="text-xs text-red-600 hover:underline ml-4"
+              >
+                Clear
+              </button>
+            </div>
+          )}
 
           <textarea
             value={authCookies}
             onChange={(e) => setAuthCookies(e.target.value)}
-            placeholder="session=abc123; other-cookie=value; ..."
+            placeholder={authCookiesSet ? "Paste new cookies to replace the saved ones…" : "session=abc123; other-cookie=value; …"}
             rows={3}
             className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
           />
@@ -309,6 +334,33 @@ export default function ProjectSettingsPage() {
             className="mt-4 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {saving ? "Saving..." : "Save auth settings"}
+          </button>
+        </div>
+
+        {/* Allowed preview hosts */}
+        <div className="bg-white rounded-xl border p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-1">Allowed preview hosts</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Only preview URLs from these hosts can be used to create reviews for this project.
+            Wildcard subdomains are supported (e.g. <code className="font-mono text-xs bg-gray-100 px-1 rounded">*.vercel.app</code>).
+          </p>
+          <textarea
+            value={allowedPreviewHosts}
+            onChange={(e) => setAllowedPreviewHosts(e.target.value)}
+            placeholder={"*.vercel.app\nstaging.example.com"}
+            rows={4}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            One host per line. Subdomains of your production domain are always allowed.
+          </p>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={(e) => saveSettings(e as unknown as React.FormEvent)}
+            className="mt-4 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {saving ? "Saving..." : "Save host settings"}
           </button>
         </div>
 

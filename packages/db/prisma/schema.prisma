@@ -72,8 +72,9 @@ model Project {
   productionUrl     String
   previewSourceType String   @default("manual") // "manual" | "vercel" | "github"
   viewportPresets   Json     @default("[\"desktop\"]") // ["desktop","tablet","mobile"]
-  webhookSecret     String?  // shared secret for GitHub/Vercel webhooks
-  authCookies       String?  @db.Text // raw Cookie header value for protected routes
+  webhookSecret        String?  // shared secret for GitHub/Vercel webhooks
+  authCookies          String?  @db.Text // encrypted Cookie header value for protected routes
+  allowedPreviewHosts  Json     @default("[]") // ["*.vercel.app", "staging.example.com"]
   settings          Json     @default("{}")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
