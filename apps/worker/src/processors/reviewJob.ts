@@ -54,10 +54,23 @@ export async function reviewJobProcessor(
         try {
           console.log(`[worker] Capturing ${route.path} @ ${preset}`);
 
-          [beforeBuffer, afterBuffer] = await Promise.all([
+          const capture = () => Promise.all([
             captureScreenshot({ browser, url: beforeUrl, viewport, ignoreRules: route.ignoreRules, authCookies }),
             captureScreenshot({ browser, url: afterUrl,  viewport, ignoreRules: route.ignoreRules, authCookies }),
           ]);
+
+          try {
+            [beforeBuffer, afterBuffer] = await capture();
+          } catch (netErr) {
+            const msg = netErr instanceof Error ? netErr.message : String(netErr);
+            if (msg.includes("ERR_NETWORK_CHANGED") || msg.includes("ERR_NETWORK_IO_SUSPENDED")) {
+              console.warn(`[worker] Network error, retrying ${route.path} @ ${preset}...`);
+              await new Promise((r) => setTimeout(r, 3000));
+              [beforeBuffer, afterBuffer] = await capture();
+            } else {
+              throw netErr;
+            }
+          }
 
           const [beforeUrl_, afterUrl_] = await Promise.all([
             uploadScreenshot(buildKey(reviewId, route.routeId, `${preset}-before`), beforeBuffer),

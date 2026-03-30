@@ -1,4 +1,4 @@
-import type { Browser, Cookie } from "playwright";
+import type { Browser } from "playwright";
 import { stabilizePage } from "./stabilize.js";
 
 export interface ScreenshotOptions {
@@ -9,23 +9,31 @@ export interface ScreenshotOptions {
   authCookies?: string | null;
 }
 
+type CookieParam = { name: string; value: string; url: string };
+
 /**
  * Parses a raw Cookie header string (e.g. "name1=val1; name2=val2")
- * into Playwright Cookie objects scoped to the given URL's hostname.
+ * into Playwright cookie params using the `url` field so Chrome handles
+ * __Host- and __Secure- prefix constraints automatically.
  */
-function parseCookieHeader(raw: string, url: string): Cookie[] {
-  const hostname = new URL(url).hostname;
-  return raw
+function parseCookieHeader(raw: string, url: string): CookieParam[] {
+  const origin = new URL(url).origin;
+
+  // Strip "Cookie:" or "Cookie\n\t" header prefix if user copied the header name too
+  const cleaned = raw.replace(/^Cookie\s*:?\s*/i, "").trim();
+
+  return cleaned
     .split(";")
     .map((part) => {
       const eqIdx = part.indexOf("=");
       if (eqIdx === -1) return null;
-      const name = part.slice(0, eqIdx).trim();
+      // Remove all whitespace (including newlines/tabs) from name
+      const name = part.slice(0, eqIdx).replace(/\s/g, "");
       const value = part.slice(eqIdx + 1).trim();
       if (!name) return null;
-      return { name, value, domain: hostname, path: "/" } as Cookie;
+      return { name, value, url: origin };
     })
-    .filter((c): c is Cookie => c !== null);
+    .filter((c): c is CookieParam => c !== null);
 }
 
 export async function captureScreenshot(
@@ -36,14 +44,17 @@ export async function captureScreenshot(
   const context = await browser.newContext({
     viewport,
     deviceScaleFactor: 1,
-    // Bypass common auth checks / CSP issues in screenshots
     ignoreHTTPSErrors: true,
   });
 
   if (authCookies) {
     const cookies = parseCookieHeader(authCookies, url);
-    if (cookies.length > 0) {
-      await context.addCookies(cookies);
+    for (const cookie of cookies) {
+      try {
+        await context.addCookies([cookie]);
+      } catch {
+        // Invalid cookie (e.g. __Host- prefix constraint) — skip and continue
+      }
     }
   }
 
