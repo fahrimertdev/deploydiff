@@ -15,6 +15,7 @@ export interface ReviewJobPayload {
   productionUrl: string;
   previewUrl: string;
   viewportPresets: string[]; // ["desktop", "tablet", "mobile"]
+  authCookies?: string | null; // raw Cookie header value for protected routes
   routes: Array<{
     routeId: string;
     path: string;

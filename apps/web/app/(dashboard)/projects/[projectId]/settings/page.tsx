@@ -12,6 +12,7 @@ interface Project {
   productionUrl: string;
   viewportPresets: string[];
   webhookSecret: string | null;
+  authCookies: string | null;
 }
 
 const VIEWPORT_OPTIONS = [
@@ -28,6 +29,7 @@ export default function ProjectSettingsPage() {
   const [productionUrl, setProductionUrl] = useState("");
   const [viewports, setViewports]         = useState<string[]>(["desktop"]);
   const [webhookSecret, setWebhookSecret] = useState("");
+  const [authCookies, setAuthCookies]     = useState("");
   const [saving, setSaving]               = useState(false);
   const [deleting, setDeleting]           = useState(false);
   const [error, setError]                 = useState<string | null>(null);
@@ -44,6 +46,7 @@ export default function ProjectSettingsPage() {
         setProductionUrl(p.productionUrl);
         setViewports((p.viewportPresets as string[]) ?? ["desktop"]);
         setWebhookSecret(p.webhookSecret ?? "");
+        setAuthCookies(p.authCookies ?? "");
       });
   }, [params.projectId]);
 
@@ -70,6 +73,7 @@ export default function ProjectSettingsPage() {
           productionUrl,
           viewportPresets: viewports,
           webhookSecret: webhookSecret || null,
+          authCookies: authCookies || null,
         }),
       });
 
@@ -263,6 +267,48 @@ export default function ProjectSettingsPage() {
             className="mt-4 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
             {saving ? "Saving..." : "Save webhook settings"}
+          </button>
+        </div>
+
+        {/* Auth cookies */}
+        <div className="bg-white rounded-xl border p-6">
+          <h2 className="text-base font-semibold text-gray-900 mb-1">Authentication</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Paste your session cookies here so the capture engine can access routes that require login.
+          </p>
+
+          <div className="bg-gray-50 border rounded-lg p-4 mb-4 space-y-2">
+            <p className="text-xs font-semibold text-gray-700">How to get your cookies</p>
+            <ol className="text-xs text-gray-600 space-y-1.5 list-decimal list-inside">
+              <li>Open your app in Chrome and <strong>sign in</strong> with a test account</li>
+              <li>Press <kbd className="bg-white border rounded px-1 py-0.5 font-mono text-[10px]">F12</kbd> to open DevTools → go to the <strong>Network</strong> tab</li>
+              <li>Refresh the page, then click on any request to your site</li>
+              <li>In the <strong>Headers</strong> panel, find <strong>Request Headers</strong></li>
+              <li>Copy the full value next to <code className="bg-white border rounded px-1 font-mono text-[10px]">Cookie:</code> and paste below</li>
+            </ol>
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mt-2">
+              Use a <strong>dedicated test account</strong>, not your personal account. Cookies grant full access to the account.
+            </p>
+          </div>
+
+          <textarea
+            value={authCookies}
+            onChange={(e) => setAuthCookies(e.target.value)}
+            placeholder="session=abc123; other-cookie=value; ..."
+            rows={3}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-xs font-mono focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Leave blank if your routes are publicly accessible.
+          </p>
+
+          <button
+            type="button"
+            disabled={saving}
+            onClick={(e) => saveSettings(e as unknown as React.FormEvent)}
+            className="mt-4 bg-primary text-primary-foreground rounded-lg px-4 py-2 text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {saving ? "Saving..." : "Save auth settings"}
           </button>
         </div>
 

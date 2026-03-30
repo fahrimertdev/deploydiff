@@ -18,7 +18,7 @@ const VIEWPORT_SIZES: Record<string, { width: number; height: number }> = {
 export async function reviewJobProcessor(
   job: Job<ReviewJobPayload>
 ): Promise<void> {
-  const { reviewId, productionUrl, previewUrl, routes, viewportPresets } = job.data;
+  const { reviewId, productionUrl, previewUrl, routes, viewportPresets, authCookies } = job.data;
   const presets = viewportPresets?.length ? viewportPresets : ["desktop"];
 
   console.log(
@@ -55,8 +55,8 @@ export async function reviewJobProcessor(
           console.log(`[worker] Capturing ${route.path} @ ${preset}`);
 
           [beforeBuffer, afterBuffer] = await Promise.all([
-            captureScreenshot({ browser, url: beforeUrl, viewport, ignoreRules: route.ignoreRules }),
-            captureScreenshot({ browser, url: afterUrl,  viewport, ignoreRules: route.ignoreRules }),
+            captureScreenshot({ browser, url: beforeUrl, viewport, ignoreRules: route.ignoreRules, authCookies }),
+            captureScreenshot({ browser, url: afterUrl,  viewport, ignoreRules: route.ignoreRules, authCookies }),
           ]);
 
           const [beforeUrl_, afterUrl_] = await Promise.all([

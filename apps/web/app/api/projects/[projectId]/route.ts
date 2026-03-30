@@ -14,6 +14,7 @@ const updateProjectSchema = z.object({
   productionUrl: z.string().url().optional(),
   viewportPresets: z.array(z.enum(["desktop", "tablet", "mobile"])).min(1).optional(),
   webhookSecret: z.string().max(200).nullable().optional(),
+  authCookies: z.string().max(10000).nullable().optional(),
 });
 
 export async function GET(

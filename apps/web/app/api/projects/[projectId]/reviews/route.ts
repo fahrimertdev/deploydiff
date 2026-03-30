@@ -104,6 +104,7 @@ export async function POST(
         productionUrl: project.productionUrl,
         previewUrl,
         viewportPresets,
+        authCookies: project.authCookies ?? null,
         routes: project.routes.map((route) => ({
           routeId: route.id,
           path: route.path,

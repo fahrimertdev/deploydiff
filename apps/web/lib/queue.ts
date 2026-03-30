@@ -45,6 +45,7 @@ export interface ReviewJobPayload {
   productionUrl: string;
   previewUrl: string;
   viewportPresets: string[];
+  authCookies?: string | null;
   routes: Array<{
     routeId: string;
     path: string;
