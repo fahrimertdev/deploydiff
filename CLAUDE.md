@@ -131,6 +131,321 @@ Long term, this product can evolve into:
 
 ---
 
+## Security-First Product Principle
+
+DeployDiff must **not** behave like an open public URL screenshot tool.
+
+Users should **not** be able to type any arbitrary URL on the internet and create a review.
+
+Review generation must only happen for:
+- projects that belong to a workspace
+- domains or preview sources controlled by that workspace
+- verified or explicitly authorized URLs
+- authenticated integrations or trusted project configuration
+
+Core rule:
+
+**Review creation is restricted. Review access can be selectively shared.**
+
+This is a foundational requirement, not an optional enhancement.
+
+---
+
+## Trust Model
+
+DeployDiff operates on a project trust model.
+
+Every review must belong to:
+- a workspace
+- a project
+- a verified or authorized source
+
+The system should trust reviews only when they originate from one of the following:
+1. a manually configured and allowed project URL
+2. a verified production or staging domain
+3. an approved preview host pattern
+4. a connected GitHub / GitLab / Vercel / Netlify integration
+5. a signed webhook or trusted deploy event
+
+The system should never treat random user-submitted URLs as trusted input.
+
+---
+
+## Permission Model
+
+DeployDiff has two distinct permission layers:
+
+### 1. Review Creation Permissions
+This must be restricted.
+
+Only the following can create reviews:
+- workspace owner
+- workspace admin
+- workspace member with review-create permission
+- trusted integration acting on behalf of the workspace
+
+Guests and external reviewers must not be allowed to create reviews.
+
+### 2. Review Access Permissions
+This can be selectively shared.
+
+A review may be visible to:
+- internal workspace members
+- invited reviewers
+- client reviewers
+- guests using a protected share link
+
+External access is only for viewing, commenting, and approval within a specific shared review context.
+
+They must not gain project-wide access.
+
+---
+
+## Roles
+
+### Owner
+Can:
+- manage workspace
+- manage billing
+- manage integrations
+- manage project settings
+- verify domains
+- create reviews
+- manage members
+- manage reviewer policies
+
+### Admin
+Can:
+- manage projects
+- manage routes
+- create reviews
+- manage share settings
+- view and manage comments
+- approve workflows depending on workspace policy
+
+### Member
+Can:
+- create reviews for authorized projects
+- view internal reviews
+- comment
+- approve if permitted
+
+### Client Reviewer
+Can:
+- access only explicitly shared reviews
+- comment on those reviews
+- approve or reject if link or invitation policy allows
+
+Cannot:
+- create projects
+- create reviews
+- browse workspace data
+- access unrelated reviews
+
+### Guest
+Can:
+- open a specific share link if allowed
+- leave limited feedback if the review permits guest access
+
+Cannot:
+- create reviews
+- discover projects
+- access other reviews
+- access internal settings
+
+---
+
+## URL Authorization Rules
+
+A review can only be created if both the production and preview targets satisfy authorization rules.
+
+### Allowed sources
+- verified production domain
+- verified staging domain
+- explicitly allowed preview host
+- integration-provided preview URL
+- pre-approved manual URL inside the project allowlist
+
+### Disallowed sources
+- arbitrary external domains
+- localhost
+- internal IP addresses
+- private network ranges
+- link-local ranges
+- metadata service endpoints
+- unexpected redirect targets
+- non-http/https schemes
+
+A project should maintain an allowlist such as:
+- production_url
+- staging_urls
+- allowed_preview_hosts
+- allowed_preview_patterns
+- allowed_routes
+
+---
+
+## Domain Verification Rules
+
+For production-grade trust, projects should support domain verification.
+
+Possible methods:
+- DNS TXT verification
+- HTML file verification
+- meta tag verification
+- integration-based ownership proof
+
+Production domains should ideally be verified before being used in live review workflows.
+
+Manual setup may be allowed in MVP, but the long-term design should prefer verified ownership.
+
+---
+
+## Preview Source Rules
+
+Preview URLs should preferably come from trusted integrations:
+- Vercel preview deployment
+- Netlify deploy preview
+- GitHub app / PR-linked deployment
+- GitLab environment preview
+
+If manual preview URLs are allowed in MVP, they must still match:
+- allowed host list
+- allowed wildcard policy defined by the project
+- optional signed token or owner-created session
+
+Wildcard support must be conservative.
+
+Example of safer logic:
+- allowed: `*.team-preview.example.com`
+- less safe and should be avoided by default: all `*.vercel.app`
+
+The product should favor explicit project-scoped patterns over global wildcard trust.
+
+---
+
+## Review Creation Restrictions
+
+The system must not allow:
+- unauthenticated users to create reviews
+- reviewers to create new reviews
+- guests to trigger screenshot jobs
+- arbitrary URL comparison
+- project-less review creation
+
+Every review creation request must validate:
+1. authenticated actor or trusted integration
+2. workspace membership
+3. project ownership or permission
+4. allowed source URLs
+5. route allowlist
+6. capture safety rules
+7. rate limits and quota checks
+
+If any of these fail, the review must not be created.
+
+---
+
+## Share Link Access Rules
+
+Share links should grant access only to a specific review.
+
+They should never expose:
+- full workspace data
+- other reviews
+- project settings
+- integrations
+- team member information beyond what is intentionally shared
+
+### Share link options
+- public-but-secret token link
+- password-protected link
+- email-invited reviewer link
+- expiring link
+- limited permissions link
+
+Share links should support permissions such as:
+- view only
+- comment
+- approve/reject
+
+A share link should never allow review creation.
+
+---
+
+## Abuse Prevention Rules
+
+DeployDiff must actively prevent platform abuse.
+
+### Blocked targets
+Never allow capture against:
+- `localhost`
+- `127.0.0.1`
+- `0.0.0.0`
+- `10.0.0.0/8`
+- `172.16.0.0/12`
+- `192.168.0.0/16`
+- `169.254.0.0/16`
+- cloud metadata IPs
+- internal DNS names
+- non-routable/private network targets
+
+### Blocked behavior
+- open proxy style usage
+- SSRF-style access patterns
+- arbitrary port scanning
+- excessive redirect chains
+- repeated failed capture abuse
+- mass review generation against many hosts
+
+### Safety controls
+- strict URL parsing
+- DNS resolution checks
+- IP classification before capture
+- redirect validation
+- rate limiting
+- workspace quotas
+- job concurrency caps
+- audit logging
+- anomaly detection
+
+---
+
+## Authenticated Route Policy
+
+Authenticated pages may be captured only when the project owner explicitly configures access.
+
+Supported models may include:
+- saved session cookies
+- test user credentials
+- scripted login flows
+- integration-backed preview auth
+- environment-specific auth bypass for preview only
+
+Credentials and sessions must be stored securely.
+
+The product should never encourage unsafe practices such as exposing admin credentials in plain text or allowing shared reviewer links to inherit internal authenticated access outside intended route capture.
+
+---
+
+## Auditability
+
+The system should log critical security actions:
+- who created a project
+- who verified a domain
+- who changed allowed hosts
+- who created a review
+- which URLs were captured
+- who opened a share link
+- who commented
+- who approved or rejected
+- failed capture attempts
+- rejected security validation events
+
+Audit trails are valuable for both trust and abuse investigation.
+
+---
+
 ## MVP Scope
 
 The first version should stay focused.
@@ -155,6 +470,9 @@ Create a reliable workflow where a user can:
 - comments
 - approve / reject status
 - shareable link
+- project-scoped URL allowlist
+- restricted review creation permissions
+- basic guest or client reviewer access controls
 
 ### Explicitly not required in MVP
 - perfect route crawling
@@ -195,11 +513,13 @@ As a product team, we want a clear review status before release, so we reduce ac
    - production URL
    - preview URL source
    - routes to compare
+   - allowed hosts or verification data if needed
 3. A new deploy review job starts
-4. System captures screenshots
-5. System computes visual diffs
-6. System builds a review page
-7. User shares the review link
+4. System validates permissions and URL safety
+5. System captures screenshots
+6. System computes visual diffs
+7. System builds a review page
+8. User shares the review link
 
 ### Flow 2 — Reviewer feedback
 1. Reviewer opens the review page
@@ -221,8 +541,11 @@ As a product team, we want a clear review status before release, so we reduce ac
 ## 1. Project Setup Module
 Stores:
 - project name
+- workspace_id
 - production URL
 - preview source
+- allowed hosts
+- domain verification state
 - review route configuration
 - optional auth config
 - viewport defaults
@@ -240,7 +563,7 @@ Initial support can be simple.
 - GitHub
 - Vercel
 - Netlify
-- manual preview URL input
+- manual preview URL input under project restrictions
 
 ### Later integrations
 - GitLab
@@ -250,6 +573,8 @@ Initial support can be simple.
 
 The goal is not to build every integration on day one.  
 The goal is to make review generation easy and dependable.
+
+Integrations should be treated as trust signals for preview source legitimacy.
 
 ---
 
@@ -271,6 +596,9 @@ Each route record may include:
 - requires auth
 - viewport overrides
 - ignore regions
+- enabled_for_review
+
+Only allowed routes should be capturable.
 
 ---
 
@@ -295,6 +623,8 @@ Use a headless browser automation engine such as Playwright.
 - cookie banner handling
 - auth session support
 - screenshot storage
+- URL safety validation before navigation
+- redirect validation during navigation
 
 ---
 
@@ -338,6 +668,8 @@ This is the main user-facing surface.
 - easy to scan
 - strong visual emphasis
 
+The share view should reveal only what the reviewer needs.
+
 ---
 
 ## 7. Commenting Module
@@ -354,6 +686,8 @@ Comments should be tied to context.
 - mention teammates
 - resolve/unresolve
 - comment filters
+
+Guest comments should be tied to a specific review token and rate-limited.
 
 ---
 
@@ -372,6 +706,8 @@ Approvals transform the product from a viewer into a workflow tool.
 - audit history
 - conditional deploy gate
 
+Approvals from share links must be scoped to that review only.
+
 ---
 
 ## 9. Share Layer
@@ -381,12 +717,15 @@ A big part of the value is how easily the review can be shared.
 - shareable review link
 - optional password protection
 - reviewer name capture
+- scoped guest permissions
 
 ### Later
 - expiring links
 - branded links
 - client portals
 - email invitation flows
+
+Share links must never expose unrelated resources.
 
 ---
 
@@ -493,15 +832,17 @@ Trust is a product requirement, not only a technical metric.
 
 ### Suggested high-level flow
 1. webhook or manual trigger received
-2. review job created
-3. routes resolved
-4. production pages captured
-5. preview pages captured
-6. visual diffs computed
-7. artifacts stored
-8. review record created
-9. share link generated
-10. notifications sent
+2. actor and project permission validated
+3. review job created
+4. routes resolved
+5. capture targets validated against allowlist and safety rules
+6. production pages captured
+7. preview pages captured
+8. visual diffs computed
+9. artifacts stored
+10. review record created
+11. share link generated
+12. notifications sent
 
 ---
 
@@ -521,6 +862,8 @@ Handles:
 Handles:
 - integrations
 - review job orchestration
+- permission checks
+- URL authorization checks
 - route management
 - comment and approval logic
 - notification logic
@@ -545,13 +888,40 @@ For:
 
 ## Suggested Data Model
 
+### Workspace
+- id
+- name
+- owner_id
+- plan
+- settings
+- created_at
+
+### WorkspaceMember
+- id
+- workspace_id
+- user_id
+- role
+- permissions
+- created_at
+
 ### Project
 - id
+- workspace_id
 - name
 - owner_id
 - production_url
 - preview_source_type
 - settings
+- domain_verification_status
+- created_at
+
+### AllowedHost
+- id
+- project_id
+- host
+- type
+- pattern
+- verified
 - created_at
 
 ### Route
@@ -572,6 +942,7 @@ For:
 - status
 - approval_status
 - summary
+- created_by
 - created_at
 
 ### ReviewPage
@@ -589,6 +960,7 @@ For:
 - review_id
 - review_page_id
 - author_id_or_guest
+- share_token_id_nullable
 - body
 - status
 - created_at
@@ -597,9 +969,49 @@ For:
 - id
 - review_id
 - actor_id_or_guest
+- share_token_id_nullable
 - decision
 - note
 - created_at
+
+### ShareToken
+- id
+- review_id
+- token_hash
+- access_mode
+- password_hash_nullable
+- expires_at_nullable
+- created_by
+- created_at
+
+### AuditEvent
+- id
+- workspace_id
+- project_id_nullable
+- actor_id_nullable
+- event_type
+- metadata
+- created_at
+
+---
+
+## Security Validation Rules
+
+Before any capture starts, validate:
+- actor is authorized
+- project exists in workspace
+- target URLs belong to allowed hosts
+- DNS resolution does not point to blocked IP ranges
+- scheme is http or https only
+- redirect chain stays within approved policy
+- route is allowed
+- project quota is not exceeded
+- rate limit is not exceeded
+
+On failure:
+- do not start capture
+- store a rejected audit event
+- return safe error messaging
 
 ---
 
@@ -632,6 +1044,12 @@ The share view should remove unnecessary technical detail and focus on:
 - where
 - comments
 - approval
+
+It should not show:
+- project config
+- integrations
+- unrelated routes
+- workspace internals
 
 ---
 
@@ -711,7 +1129,10 @@ Complex websites may render inconsistently.
 ### 3. Weak onboarding
 If setup is hard, people churn early.
 
-### 4. Overbuilding too early
+### 4. Security misuse
+If arbitrary URL capture is possible, the platform can be abused.
+
+### 5. Overbuilding too early
 Do not add too many enterprise-style workflows before the core review loop is solid.
 
 ---
@@ -724,6 +1145,9 @@ Do not add too many enterprise-style workflows before the core review loop is so
 - build strong ignore-region handling
 - make review pages excellent before adding many integrations
 - keep approval model simple at first
+- restrict review creation to project members
+- enforce project-scoped host allowlists
+- block internal/private network targets
 
 ---
 
@@ -734,6 +1158,7 @@ Do not add too many enterprise-style workflows before the core review loop is so
 - production URL
 - preview URL
 - route list
+- project allowlist
 - screenshot diff
 - shareable review page
 - comments
@@ -745,12 +1170,14 @@ Do not add too many enterprise-style workflows before the core review loop is so
 - better route management
 - mobile and tablet viewports
 - summary improvements
+- domain verification
 
 ### Phase 3
 - approval gates
 - Slack or email notifications
 - branded client portals
 - multi-project agency workspace
+- stronger auditability
 
 ---
 
@@ -768,6 +1195,13 @@ Do not add too many enterprise-style workflows before the core review loop is so
 - review generation time
 - false-positive complaint rate
 - diff trust score from users
+
+### Security metrics
+- rejected review creation attempts
+- blocked private-network URL attempts
+- invalid redirect attempts
+- guest abuse rate
+- suspicious capture rate
 
 ### Commercial metrics
 - projects per workspace
@@ -792,6 +1226,8 @@ DeployDiff is successful if:
 - comments and approvals happen inside the product
 - users trust the output enough to rely on it before deployment
 - freelancers and agencies feel more professional using it
+- unauthorized users cannot create arbitrary reviews
+- the platform resists abuse by design
 
 ---
 
@@ -803,6 +1239,7 @@ Do not try to build:
 - enterprise compliance platform
 - all-in-one CI/CD platform
 - broad code review replacement
+- open public URL screenshot infrastructure
 
 Stay focused on:
 **visual deploy review + share + comments + approval**
@@ -821,6 +1258,9 @@ When building this product, follow these principles:
 - keep the first setup as simple as possible
 - treat trust as a core product feature
 - design for freelancers and agencies first
+- restrict review creation by default
+- never trust arbitrary URLs
+- prefer verified and integration-backed sources
 
 ---
 
@@ -848,6 +1288,7 @@ The important part is:
 - stable captures
 - good review UX
 - scalable artifact storage
+- secure URL validation and capture controls
 
 ---
 
@@ -891,5 +1332,7 @@ Focus first on:
 - shareable review pages
 - comments
 - approvals
+- strict project-scoped review creation
+- safe URL authorization
 
 Everything else comes after that foundation is excellent.
