@@ -13,7 +13,7 @@ interface Cidr4 { base: number; mask: number }
 
 function cidr4(ip: string, bits: number): Cidr4 {
   const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
-  return { base: ipv4ToUint32(ip) & mask, mask };
+  return { base: (ipv4ToUint32(ip) & mask) >>> 0, mask };
 }
 
 const BLOCKED_V4: Cidr4[] = [
