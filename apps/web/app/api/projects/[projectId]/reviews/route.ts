@@ -124,7 +124,13 @@ export async function POST(
         productionUrl: project.productionUrl,
         previewUrl,
         viewportPresets,
-        authCookies: project.authCookies ? decrypt(project.authCookies) : null,
+        authCookies: (() => {
+          if (!project.authCookies) return null;
+          // Must be iv:authTag:ciphertext format — ignore legacy plaintext values
+          const parts = project.authCookies.split(":");
+          if (parts.length !== 3) return null;
+          try { return decrypt(project.authCookies); } catch { return null; }
+        })(),
         routes: project.routes.map((route) => ({
           routeId: route.id,
           path: route.path,
