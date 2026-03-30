@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
+  // Note: output: "standalone" is intentionally omitted for Vercel deployment.
+  // For self-hosted (Docker), add it back.
   experimental: {
     serverComponentsExternalPackages: ["@prisma/client", ".prisma/client"],
   },
@@ -20,6 +21,12 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "*.r2.cloudflarestorage.com",
+        pathname: "/**",
+      },
+      {
+        // Cloudflare R2 public bucket (if using custom domain)
+        protocol: "https",
+        hostname: "*.cloudflarestorage.com",
         pathname: "/**",
       },
     ],
